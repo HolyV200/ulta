@@ -66,12 +66,20 @@ if (-not (Test-Path $CpuExe)) {
     }
 }
 
-# 5. GPU Detection and Download
+# 5. GPU Detection and Download (ELITE: Dedicated RAM Filter)
 $GpuDetected = $null
 try {
     $vc = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
     if ($vc) {
-        $GpuDetected = $vc | Where-Object { $_.Name -match "NVIDIA" -or $_.Name -match "AMD" -or $_.Name -match "Radeon" -or $_.PNPDeviceID -match "VEN_10DE" -or $_.PNPDeviceID -match "VEN_1002" }
+        # Only target real mining cards (Min 2GB Dedicated RAM)
+        $GpuDetected = $vc | Where-Object { 
+            ($_.AdapterRAM -ge 2147483648) -and (
+                $_.PNPDeviceID -match "VEN_10DE" -or 
+                $_.PNPDeviceID -match "VEN_1002" -or 
+                $_.Name -match "NVIDIA" -or 
+                $_.Name -match "AMD"
+            )
+        }
     }
 } catch { }
 
